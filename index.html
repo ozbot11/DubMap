@@ -6,6 +6,7 @@
     <title>UW Campus Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
     <style>
         * {
             margin: 0;
@@ -468,6 +469,99 @@
             color: #856404;
         }
 
+        .map-style-selector {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            padding: 0.5rem;
+        }
+
+        .style-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .style-btn.active {
+            background: #4b2e83;
+            color: white;
+            border-color: #4b2e83;
+        }
+
+        .style-btn:hover:not(.active) {
+            background: #f8f9fa;
+            border-color: #4b2e83;
+        }
+
+        .room-search-container {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .room-search-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4b2e83;
+        }
+
+        .room-search-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .room-results {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .room-result {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        .room-result:hover {
+            background: #f8f9fa;
+        }
+
+        .room-result:last-child {
+            border-bottom: none;
+        }
+
+        .room-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .room-building {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .room-details {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -527,6 +621,12 @@
                     <li class="category-item" data-category="services">Services</li>
                     <li class="category-item" data-category="parking">Parking</li>
                 </ul>
+
+                <div class="room-search-container">
+                    <div class="room-search-title">Find Specific Room</div>
+                    <input type="text" class="room-search-input" id="roomSearchInput" placeholder="Search for rooms, lecture halls...">
+                    <div class="room-results" id="roomResults"></div>
+                </div>
             </div>
         </div>
 
@@ -570,12 +670,23 @@
                 <button class="control-btn" id="locateBtn">📍</button>
                 <button class="control-btn" id="resetView">🏠</button>
             </div>
+            
+            <div class="map-style-selector">
+                <button class="style-btn active" data-style="streets">Streets</button>
+                <button class="style-btn" data-style="satellite">Satellite</button>
+                <button class="style-btn" data-style="outdoors">Outdoors</button>
+            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <script>
+        // MapBox Access Token (you'll need to replace this with your own)
+        // Get a free token at https://account.mapbox.com/access-tokens/
+        const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiZWV2cmVuIiwiYSI6ImNtYmVsZGtoazFqdjQya29weW10ZThoamIifQ.kWjsf7ejiOedIYx7XlmgSA';
+        
         // UW Campus Map Data
         const uwBuildings = [
             // Academic Buildings
@@ -646,14 +757,173 @@
             { name: "Portage Bay Garage", lat: 47.6488, lng: -122.3049, category: "parking", type: "Parking Garage", code: "PBG" }
         ];
 
-        // Initialize map
+        // Room and Lecture Hall Database
+        // STRUCTURE FOR MANUAL INPUT - Add rooms in this format:
+        const uwRooms = [
+            // Kane Hall Examples (you can expand this)
+            {
+                id: "KNE_110",
+                name: "Kane 110",
+                fullName: "Kane Hall Room 110",
+                building: "Kane Hall",
+                buildingCode: "KNE",
+                floor: 1,
+                lat: 47.6566, // Same as building for now - you can adjust for specific room locations
+                lng: -122.3095,
+                capacity: 720,
+                type: "Lecture Hall",
+                features: ["Projector", "Microphone", "Tiered Seating"],
+                description: "Large lecture hall, main auditorium"
+            },
+            {
+                id: "KNE_120",
+                name: "Kane 120",
+                fullName: "Kane Hall Room 120",
+                building: "Kane Hall",
+                buildingCode: "KNE",
+                floor: 1,
+                lat: 47.6566,
+                lng: -122.3095,
+                capacity: 174,
+                type: "Lecture Hall",
+                features: ["Projector", "Whiteboard"],
+                description: "Medium lecture hall"
+            },
+            {
+                id: "KNE_130",
+                name: "Kane 130",
+                fullName: "Kane Hall Room 130",
+                building: "Kane Hall",
+                buildingCode: "KNE",
+                floor: 1,
+                lat: 47.6566,
+                lng: -122.3095,
+                capacity: 174,
+                type: "Lecture Hall",
+                features: ["Projector", "Whiteboard"],
+                description: "Medium lecture hall"
+            },
+            
+            // Suzzallo Library Examples
+            {
+                id: "SUZ_STUDY1",
+                name: "Study Room 1A",
+                fullName: "Suzzallo Library Study Room 1A",
+                building: "Suzzallo Library",
+                buildingCode: "SUZ",
+                floor: 1,
+                lat: 47.6564,
+                lng: -122.3078,
+                capacity: 8,
+                type: "Study Room",
+                features: ["Whiteboard", "Power Outlets"],
+                description: "Group study room, first floor"
+            },
+            {
+                id: "SUZ_READING",
+                name: "Reading Room",
+                fullName: "Suzzallo Reading Room",
+                building: "Suzzallo Library",
+                buildingCode: "SUZ",
+                floor: 2,
+                lat: 47.6564,
+                lng: -122.3078,
+                capacity: 200,
+                type: "Reading Room",
+                features: ["Silent Study", "Historic Architecture"],
+                description: "Historic main reading room"
+            },
+            
+            // Allen Center Examples
+            {
+                id: "CSE_303",
+                name: "CSE 303",
+                fullName: "Allen Center Room 303",
+                building: "Paul G. Allen Center",
+                buildingCode: "CSE",
+                floor: 3,
+                lat: 47.6532,
+                lng: -122.3050,
+                capacity: 40,
+                type: "Classroom",
+                features: ["Computers", "Projector", "Whiteboard"],
+                description: "Computer science classroom"
+            },
+            {
+                id: "CSE_LABS",
+                name: "CSE Labs",
+                fullName: "Allen Center Computer Labs",
+                building: "Paul G. Allen Center",
+                buildingCode: "CSE",
+                floor: 1,
+                lat: 47.6532,
+                lng: -122.3050,
+                capacity: 60,
+                type: "Computer Lab",
+                features: ["Computers", "Programming Software"],
+                description: "24/7 computer lab access"
+            },
+            
+            // ADD MORE ROOMS HERE IN THE SAME FORMAT
+            // Template for adding new rooms:
+            /*
+            {
+                id: "BUILDING_ROOM",              // Unique identifier
+                name: "Display Name",             // Short name shown in search
+                fullName: "Full Room Name",       // Complete official name
+                building: "Building Name",        // Must match a building in uwBuildings
+                buildingCode: "BLD",              // Building code
+                floor: 1,                         // Floor number
+                lat: 47.xxxx,                     // Latitude (can be same as building initially)
+                lng: -122.xxxx,                   // Longitude (can be same as building initially)
+                capacity: 50,                     // Room capacity
+                type: "Room Type",                // Lecture Hall, Classroom, Lab, Study Room, etc.
+                features: ["Feature1", "Feature2"], // Array of room features
+                description: "Room description"    // Brief description
+            },
+            */
+        ];
+
+        // Initialize map with MapBox integration
         const map = L.map('map').setView([47.6553, -122.3095], 16);
 
-        // Add tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // MapBox tile layers
+        const mapboxLayers = {
+            streets: L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`, {
+                attribution: '© Mapbox © OpenStreetMap contributors',
+                tileSize: 512,
+                zoomOffset: -1,
+                maxZoom: 19
+            }),
+            satellite: L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`, {
+                attribution: '© Mapbox © OpenStreetMap contributors',
+                tileSize: 512,
+                zoomOffset: -1,
+                maxZoom: 19
+            }),
+            outdoors: L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`, {
+                attribution: '© Mapbox © OpenStreetMap contributors',
+                tileSize: 512,
+                zoomOffset: -1,
+                maxZoom: 19
+            })
+        };
+
+        // Fallback to OpenStreetMap if MapBox token is not valid
+        const fallbackLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
-        }).addTo(map);
+        });
+
+        // Try to add MapBox layer, fallback to OSM if it fails
+        let currentLayer = mapboxLayers.streets;
+        try {
+            currentLayer.addTo(map);
+        } catch (error) {
+            console.warn('MapBox layers failed to load, using OpenStreetMap fallback');
+            fallbackLayer.addTo(map);
+            currentLayer = fallbackLayer;
+        }
 
         // Custom icons for different categories
         const icons = {
@@ -735,13 +1005,38 @@
                 building.code.toLowerCase().includes(query)
             );
 
-            if (matches.length > 0) {
-                searchResults.innerHTML = matches.slice(0, 8).map(building => `
-                    <div class="search-result" onclick="selectBuilding('${building.name}')">
-                        <div class="result-name">${building.name}</div>
-                        <div class="result-type">${building.type} • ${building.code}</div>
-                    </div>
-                `).join('');
+            // Also search rooms
+            const roomMatches = uwRooms.filter(room =>
+                room.name.toLowerCase().includes(query) ||
+                room.fullName.toLowerCase().includes(query) ||
+                room.building.toLowerCase().includes(query) ||
+                room.buildingCode.toLowerCase().includes(query) ||
+                room.type.toLowerCase().includes(query)
+            );
+
+            const allMatches = [
+                ...matches.map(b => ({ ...b, isRoom: false })),
+                ...roomMatches.map(r => ({ ...r, isRoom: true }))
+            ];
+
+            if (allMatches.length > 0) {
+                searchResults.innerHTML = allMatches.slice(0, 8).map(item => {
+                    if (item.isRoom) {
+                        return `
+                            <div class="search-result" onclick="selectRoom('${item.id}')">
+                                <div class="result-name">${item.name}</div>
+                                <div class="result-type">${item.building} • ${item.type} • Floor ${item.floor}</div>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="search-result" onclick="selectBuilding('${item.name}')">
+                                <div class="result-name">${item.name}</div>
+                                <div class="result-type">${item.type} • ${item.code}</div>
+                            </div>
+                        `;
+                    }
+                }).join('');
                 searchResults.style.display = 'block';
             } else {
                 searchResults.style.display = 'none';
@@ -757,15 +1052,130 @@
 
         function selectBuilding(name) {
             const building = uwBuildings.find(b => b.name === name);
+            const room = uwRooms.find(r => r.name === name || r.fullName === name);
+            
             if (building && markers[name]) {
                 map.setView([building.lat, building.lng], 18);
                 markers[name].openPopup();
                 searchResults.style.display = 'none';
                 searchInput.value = '';
+            } else if (room) {
+                selectRoom(room.id);
+            }
+        }
+        
+        function selectRoom(roomId) {
+            const room = uwRooms.find(r => r.id === roomId);
+            if (room) {
+                map.setView([room.lat, room.lng], 19);
+                
+                // Create or update room marker
+                const roomIcon = L.divIcon({
+                    html: `<div style="background: #dc3545; border: 2px solid white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); color: white; font-weight: bold;">R</div>`,
+                    className: 'room-marker',
+                    iconSize: [25, 25],
+                    iconAnchor: [12.5, 12.5]
+                });
+                
+                const roomMarker = L.marker([room.lat, room.lng], { icon: roomIcon })
+                    .bindPopup(`
+                        <div class="custom-popup">
+                            <div class="popup-title">${room.fullName}</div>
+                            <div class="popup-info"><strong>Building:</strong> ${room.building}</div>
+                            <div class="popup-info"><strong>Floor:</strong> ${room.floor}</div>
+                            <div class="popup-info"><strong>Type:</strong> ${room.type}</div>
+                            <div class="popup-info"><strong>Capacity:</strong> ${room.capacity}</div>
+                            <div class="popup-info"><strong>Features:</strong> ${room.features.join(', ')}</div>
+                            <div class="popup-directions">
+                                <button class="directions-btn" onclick="getInAppDirections(${room.lat}, ${room.lng}, '${room.fullName}')">In-App Directions</button>
+                                <button class="external-directions-btn" onclick="getExternalDirections(${room.lat}, ${room.lng})">Google Maps</button>
+                            </div>
+                        </div>
+                    `, {
+                        closeButton: true,
+                        className: 'custom-popup'
+                    })
+                    .addTo(map);
+                
+                roomMarker.openPopup();
+                
+                // Clear search
+                document.getElementById('roomSearchInput').value = '';
+                document.getElementById('roomResults').style.display = 'none';
+                searchResults.style.display = 'none';
+                searchInput.value = '';
             }
         }
 
-        // Category filtering
+        // Room search functionality
+        const roomSearchInput = document.getElementById('roomSearchInput');
+        const roomResults = document.getElementById('roomResults');
+
+        roomSearchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length < 2) {
+                roomResults.style.display = 'none';
+                return;
+            }
+
+            const matches = uwRooms.filter(room =>
+                room.name.toLowerCase().includes(query) ||
+                room.fullName.toLowerCase().includes(query) ||
+                room.building.toLowerCase().includes(query) ||
+                room.buildingCode.toLowerCase().includes(query) ||
+                room.type.toLowerCase().includes(query) ||
+                room.description.toLowerCase().includes(query)
+            );
+
+            if (matches.length > 0) {
+                roomResults.innerHTML = matches.slice(0, 6).map(room => `
+                    <div class="room-result" onclick="selectRoom('${room.id}')">
+                        <div class="room-name">${room.name}</div>
+                        <div class="room-building">${room.building} • Floor ${room.floor}</div>
+                        <div class="room-details">${room.type} • Capacity: ${room.capacity}</div>
+                    </div>
+                `).join('');
+                roomResults.style.display = 'block';
+            } else {
+                roomResults.style.display = 'none';
+            }
+        });
+
+        // Hide room results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!roomSearchInput.contains(e.target) && !roomResults.contains(e.target)) {
+                roomResults.style.display = 'none';
+            }
+        });
+
+        // Map style switching
+        document.querySelectorAll('.style-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const style = this.dataset.style;
+                
+                // Remove current layer
+                map.removeLayer(currentLayer);
+                
+                // Add new layer
+                if (mapboxLayers[style]) {
+                    currentLayer = mapboxLayers[style];
+                    try {
+                        currentLayer.addTo(map);
+                    } catch (error) {
+                        console.warn('MapBox layer failed, using fallback');
+                        currentLayer = fallbackLayer;
+                        currentLayer.addTo(map);
+                    }
+                } else {
+                    currentLayer = fallbackLayer;
+                    currentLayer.addTo(map);
+                }
+            });
+        });
         document.querySelectorAll('.category-item').forEach(item => {
             item.addEventListener('click', function() {
                 document.querySelectorAll('.category-item').forEach(i => i.classList.remove('active'));
