@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UW Campus Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         * {
             margin: 0;
@@ -227,10 +228,244 @@
             cursor: pointer;
             font-size: 0.9rem;
             transition: background 0.2s;
+            margin-right: 0.5rem;
         }
 
         .directions-btn:hover {
             background: #3a2266;
+        }
+
+        .external-directions-btn {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .external-directions-btn:hover {
+            background: #555;
+        }
+
+        .directions-panel {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-width: 380px;
+            max-height: 500px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            padding: 1rem;
+        }
+
+        .directions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .directions-title {
+            font-weight: 600;
+            color: #4b2e83;
+        }
+
+        .close-directions {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .close-directions:hover {
+            background: #f5f5f5;
+        }
+
+        .route-summary {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .route-distance {
+            font-weight: 600;
+            color: #4b2e83;
+            font-size: 1.1rem;
+        }
+
+        .route-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .route-instructions {
+            list-style: none;
+        }
+
+        .route-step {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .route-step:last-child {
+            border-bottom: none;
+        }
+
+        .step-icon {
+            background: #4b2e83;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            margin-top: 0.1rem;
+        }
+
+        .step-text {
+            flex: 1;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .step-distance {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+
+        .clear-route-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .clear-route-btn:hover {
+            background: #c82333;
+        }
+
+        .transport-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transport-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 0.5rem 0.25rem;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        .transport-btn.active {
+            border-color: #4b2e83;
+            background: #4b2e83;
+            color: white;
+        }
+
+        .transport-btn:hover:not(.active) {
+            border-color: #4b2e83;
+            background: #f8f9fa;
+        }
+
+        .transport-icon {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .parking-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .parking-toggle input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .parking-toggle label {
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .route-segment {
+            margin-bottom: 1rem;
+        }
+
+        .segment-header {
+            background: #e8f4f8;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-weight: 600;
+            color: #4b2e83;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .scooter-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .scooter-info-title {
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .scooter-locations {
+            font-size: 0.85rem;
+            color: #856404;
         }
 
         @media (max-width: 768px) {
@@ -297,6 +532,39 @@
 
         <div class="map-container">
             <div id="map"></div>
+            <div class="directions-panel" id="directionsPanel">
+                <div class="directions-header">
+                    <div class="directions-title">Directions</div>
+                    <button class="close-directions" id="closeDirections">×</button>
+                </div>
+                <div class="transport-options">
+                    <button class="transport-btn active" data-transport="walking">
+                        <span class="transport-icon">🚶</span>
+                        Walk
+                    </button>
+                    <button class="transport-btn" data-transport="cycling">
+                        <span class="transport-icon">🚴</span>
+                        Bike
+                    </button>
+                    <button class="transport-btn" data-transport="transit">
+                        <span class="transport-icon">🚌</span>
+                        Bus
+                    </button>
+                    <button class="transport-btn" data-transport="driving">
+                        <span class="transport-icon">🚗</span>
+                        Car
+                    </button>
+                    <button class="transport-btn" data-transport="scooter">
+                        <span class="transport-icon">🛴</span>
+                        Scooter
+                    </button>
+                </div>
+                <div class="parking-toggle" id="parkingToggle" style="display: none;">
+                    <input type="checkbox" id="useParking" checked>
+                    <label for="useParking">Route to nearest parking, then walk</label>
+                </div>
+                <div id="directionsContent"></div>
+            </div>
             <div class="map-controls">
                 <button class="control-btn toggle-sidebar" id="toggleSidebar">☰</button>
                 <button class="control-btn" id="locateBtn">📍</button>
@@ -306,6 +574,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script>
         // UW Campus Map Data
         const uwBuildings = [
@@ -399,6 +668,10 @@
         // Create markers
         const markers = {};
         const markerGroup = L.layerGroup().addTo(map);
+        let currentRoute = null;
+        let userLocationMarker = null;
+        let currentTransportMode = 'walking';
+        let currentDestination = null;
 
         function createMarker(building) {
             const icon = L.divIcon({
@@ -415,7 +688,8 @@
                         <div class="popup-info"><strong>Type:</strong> ${building.type}</div>
                         <div class="popup-info"><strong>Code:</strong> ${building.code}</div>
                         <div class="popup-directions">
-                            <button class="directions-btn" onclick="getDirections(${building.lat}, ${building.lng})">Get Directions</button>
+                            <button class="directions-btn" onclick="getInAppDirections(${building.lat}, ${building.lng}, '${building.name}')">In-App Directions</button>
+                            <button class="external-directions-btn" onclick="getExternalDirections(${building.lat}, ${building.lng})">Google Maps</button>
                         </div>
                     </div>
                 `, {
@@ -523,9 +797,14 @@
                     
                     map.setView([lat, lng], 17);
                     
-                    L.marker([lat, lng], {
+                    // Remove existing user location marker
+                    if (userLocationMarker) {
+                        map.removeLayer(userLocationMarker);
+                    }
+                    
+                    userLocationMarker = L.marker([lat, lng], {
                         icon: L.divIcon({
-                            html: '<div style="background: #007bff; border: 2px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                            html: '<div style="background: #007bff; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
                             className: 'user-location',
                             iconSize: [20, 20],
                             iconAnchor: [10, 10]
@@ -538,7 +817,240 @@
         });
 
         // Directions function
-        function getDirections(lat, lng) {
+        function getInAppDirections(lat, lng, buildingName) {
+            currentDestination = { lat, lng, name: buildingName };
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const userLat = position.coords.latitude;
+                    const userLng = position.coords.longitude;
+                    
+                    // Add/update user location marker
+                    updateUserLocationMarker(userLat, userLng);
+                    
+                    // Show directions panel and calculate route
+                    document.getElementById('directionsPanel').style.display = 'block';
+                    calculateRoute(userLat, userLng, lat, lng, buildingName, currentTransportMode);
+                    
+                }, function(error) {
+                    alert('Unable to get your location. Please enable location services and try again.');
+                    console.error('Geolocation error:', error);
+                });
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+        
+        function updateUserLocationMarker(lat, lng) {
+            if (userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+            }
+            
+            userLocationMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: '<div style="background: #007bff; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                    className: 'user-location',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(map);
+        }
+        
+        function calculateRoute(userLat, userLng, destLat, destLng, buildingName, transportMode) {
+            // Clear existing route
+            if (currentRoute) {
+                map.removeControl(currentRoute);
+            }
+            
+            const useParking = document.getElementById('useParking').checked;
+            
+            if (transportMode === 'driving' && useParking) {
+                calculateDrivingWithParking(userLat, userLng, destLat, destLng, buildingName);
+            } else if (transportMode === 'scooter') {
+                calculateScooterRoute(userLat, userLng, destLat, destLng, buildingName);
+            } else {
+                calculateDirectRoute(userLat, userLng, destLat, destLng, buildingName, transportMode);
+            }
+        }
+        
+        function calculateDirectRoute(userLat, userLng, destLat, destLng, buildingName, transportMode) {
+            const routeProfile = getRouteProfile(transportMode);
+            const routeColor = getRouteColor(transportMode);
+            
+            currentRoute = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLat, userLng),
+                    L.latLng(destLat, destLng)
+                ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true,
+                showAlternatives: false,
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: routeProfile
+                }),
+                lineOptions: {
+                    styles: [
+                        { color: routeColor, weight: 6, opacity: 0.8 },
+                        { color: '#ffffff', weight: 2, opacity: 1 }
+                    ]
+                },
+                createMarker: function() { return null; },
+                show: false
+            }).on('routesfound', function(e) {
+                const route = e.routes[0];
+                showDirectionsPanel(route, buildingName, transportMode);
+            }).addTo(map);
+        }
+        
+        function calculateDrivingWithParking(userLat, userLng, destLat, destLng, buildingName) {
+            // Find nearest parking garage
+            const parkingGarages = uwBuildings.filter(b => b.category === 'parking');
+            let nearestParking = null;
+            let minDistance = Infinity;
+            
+            parkingGarages.forEach(garage => {
+                const distance = getDistance(destLat, destLng, garage.lat, garage.lng);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestParking = garage;
+                }
+            });
+            
+            if (nearestParking) {
+                // Create multi-segment route: Drive to parking, then walk to destination
+                calculateMultiSegmentRoute(userLat, userLng, destLat, destLng, buildingName, nearestParking);
+            } else {
+                // Fallback to direct driving route
+                calculateDirectRoute(userLat, userLng, destLat, destLng, buildingName, 'driving');
+            }
+        }
+        
+        function calculateMultiSegmentRoute(userLat, userLng, destLat, destLng, buildingName, parkingGarage) {
+            // First segment: Drive to parking
+            const drivingRoute = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLat, userLng),
+                    L.latLng(parkingGarage.lat, parkingGarage.lng)
+                ],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: 'driving'
+                }),
+                lineOptions: {
+                    styles: [
+                        { color: '#dc3545', weight: 6, opacity: 0.8 },
+                        { color: '#ffffff', weight: 2, opacity: 1 }
+                    ]
+                },
+                createMarker: function() { return null; },
+                show: false
+            }).addTo(map);
+            
+            // Second segment: Walk from parking to destination
+            const walkingRoute = L.Routing.control({
+                waypoints: [
+                    L.latLng(parkingGarage.lat, parkingGarage.lng),
+                    L.latLng(destLat, destLng)
+                ],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: 'foot'
+                }),
+                lineOptions: {
+                    styles: [
+                        { color: '#4b2e83', weight: 4, opacity: 0.8, dashArray: '5,5' }
+                    ]
+                },
+                createMarker: function() { return null; },
+                show: false
+            }).addTo(map);
+            
+            currentRoute = { driving: drivingRoute, walking: walkingRoute };
+            
+            // Show combined directions
+            Promise.all([
+                new Promise(resolve => drivingRoute.on('routesfound', e => resolve(e.routes[0]))),
+                new Promise(resolve => walkingRoute.on('routesfound', e => resolve(e.routes[0])))
+            ]).then(([driveRoute, walkRoute]) => {
+                showMultiSegmentDirections(driveRoute, walkRoute, buildingName, parkingGarage.name);
+            });
+        }
+        
+        function calculateScooterRoute(userLat, userLng, destLat, destLng, buildingName) {
+            // Simulate finding nearby scooters/bikes
+            const nearbyScooters = findNearbyScooters(userLat, userLng);
+            
+            // For now, use cycling route but show scooter info
+            calculateDirectRoute(userLat, userLng, destLat, destLng, buildingName, 'cycling');
+            
+            // Add scooter information to the display
+            setTimeout(() => {
+                addScooterInfo(nearbyScooters);
+            }, 1000);
+        }
+        
+        function findNearbyScooters(lat, lng) {
+            // Simulate scooter locations (in a real app, this would call Lime/Bird APIs)
+            const mockScooters = [
+                { type: 'Lime Scooter', location: 'Near HUB', distance: '0.1 miles', id: 'LM001' },
+                { type: 'Lime Bike', location: 'Red Square', distance: '0.2 miles', id: 'LB002' },
+                { type: 'Bird Scooter', location: 'Burke Museum', distance: '0.3 miles', id: 'BD003' }
+            ];
+            
+            return mockScooters;
+        }
+        
+        function addScooterInfo(scooters) {
+            const content = document.getElementById('directionsContent');
+            const scooterHtml = `
+                <div class="scooter-info">
+                    <div class="scooter-info-title">🛴 Nearby Scooters & Bikes</div>
+                    <div class="scooter-locations">
+                        ${scooters.map(s => `• ${s.type} - ${s.location} (${s.distance})`).join('<br>')}
+                    </div>
+                </div>
+            `;
+            
+            content.insertAdjacentHTML('afterbegin', scooterHtml);
+        }
+        
+        function getRouteProfile(transportMode) {
+            const profiles = {
+                'walking': 'foot',
+                'cycling': 'bicycle',
+                'driving': 'driving',
+                'transit': 'foot', // Use walking for transit planning
+                'scooter': 'bicycle'
+            };
+            return profiles[transportMode] || 'foot';
+        }
+        
+        function getRouteColor(transportMode) {
+            const colors = {
+                'walking': '#4b2e83',
+                'cycling': '#28a745',
+                'driving': '#dc3545',
+                'transit': '#007bff',
+                'scooter': '#fd7e14'
+            };
+            return colors[transportMode] || '#4b2e83';
+        }
+        
+        function getDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        function getExternalDirections(lat, lng) {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(position) {
                     const userLat = position.coords.latitude;
@@ -555,6 +1067,225 @@
                 window.open(url, '_blank');
             }
         }
+        
+        function showDirectionsPanel(route, buildingName, transportMode = 'walking') {
+            const panel = document.getElementById('directionsPanel');
+            const content = document.getElementById('directionsContent');
+            
+            const distance = (route.summary.totalDistance / 1000).toFixed(2);
+            const time = Math.round(route.summary.totalTime / 60);
+            const modeInfo = getTransportModeInfo(transportMode, time, distance);
+            
+            let instructionsHtml = `
+                <div class="route-summary">
+                    <div class="route-distance">${distance} km to ${buildingName}</div>
+                    <div class="route-time">${modeInfo}</div>
+                </div>
+                <ul class="route-instructions">
+            `;
+            
+            route.instructions.forEach((instruction, index) => {
+                const stepDistance = (instruction.distance / 1000).toFixed(2);
+                const stepIcon = getStepIcon(instruction.type);
+                
+                instructionsHtml += `
+                    <li class="route-step">
+                        <div class="step-icon">${stepIcon}</div>
+                        <div>
+                            <div class="step-text">${instruction.text}</div>
+                            <div class="step-distance">${stepDistance} km</div>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            instructionsHtml += `
+                </ul>
+                <button class="clear-route-btn" onclick="clearRoute()">Clear Route</button>
+            `;
+            
+            content.innerHTML = instructionsHtml;
+            panel.style.display = 'block';
+        }
+        
+        function showMultiSegmentDirections(driveRoute, walkRoute, buildingName, parkingName) {
+            const content = document.getElementById('directionsContent');
+            
+            const driveDistance = (driveRoute.summary.totalDistance / 1000).toFixed(2);
+            const driveTime = Math.round(driveRoute.summary.totalTime / 60);
+            const walkDistance = (walkRoute.summary.totalDistance / 1000).toFixed(2);
+            const walkTime = Math.round(walkRoute.summary.totalTime / 60);
+            const totalTime = driveTime + walkTime;
+            
+            let instructionsHtml = `
+                <div class="route-summary">
+                    <div class="route-distance">Multi-modal trip to ${buildingName}</div>
+                    <div class="route-time">Total: ~${totalTime} minutes</div>
+                </div>
+                
+                <div class="route-segment">
+                    <div class="segment-header">🚗 Drive to ${parkingName}</div>
+                    <div style="margin-bottom: 0.5rem; font-size: 0.9rem; color: #666;">${driveDistance} km • ${driveTime} min</div>
+                    <ul class="route-instructions">
+            `;
+            
+            driveRoute.instructions.forEach((instruction, index) => {
+                const stepDistance = (instruction.distance / 1000).toFixed(2);
+                const stepIcon = getStepIcon(instruction.type);
+                
+                instructionsHtml += `
+                    <li class="route-step">
+                        <div class="step-icon">${stepIcon}</div>
+                        <div>
+                            <div class="step-text">${instruction.text}</div>
+                            <div class="step-distance">${stepDistance} km</div>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            instructionsHtml += `
+                    </ul>
+                </div>
+                
+                <div class="route-segment">
+                    <div class="segment-header">🚶 Walk to ${buildingName}</div>
+                    <div style="margin-bottom: 0.5rem; font-size: 0.9rem; color: #666;">${walkDistance} km • ${walkTime} min</div>
+                    <ul class="route-instructions">
+            `;
+            
+            walkRoute.instructions.forEach((instruction, index) => {
+                const stepDistance = (instruction.distance / 1000).toFixed(2);
+                const stepIcon = getStepIcon(instruction.type);
+                
+                instructionsHtml += `
+                    <li class="route-step">
+                        <div class="step-icon">${stepIcon}</div>
+                        <div>
+                            <div class="step-text">${instruction.text}</div>
+                            <div class="step-distance">${stepDistance} km</div>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            instructionsHtml += `
+                    </ul>
+                </div>
+                <button class="clear-route-btn" onclick="clearRoute()">Clear Route</button>
+            `;
+            
+            content.innerHTML = instructionsHtml;
+        }
+        
+        function getTransportModeInfo(mode, time, distance) {
+            const modeText = {
+                'walking': `About ${time} minutes walking`,
+                'cycling': `About ${Math.round(time * 0.4)} minutes biking`,
+                'driving': `About ${Math.round(time * 0.6)} minutes driving`,
+                'transit': `About ${time + 5} minutes (including wait time)`,
+                'scooter': `About ${Math.round(time * 0.5)} minutes on scooter`
+            };
+            
+            return modeText[mode] || `About ${time} minutes`;
+        }
+        
+        function getStepIcon(type) {
+            const icons = {
+                'Head': '🚶',
+                'Continue': '↑',
+                'Turn right': '→',
+                'Turn left': '←',
+                'Sharp right': '↗',
+                'Sharp left': '↖',
+                'Slight right': '↱',
+                'Slight left': '↰',
+                'Arrive': '🎯'
+            };
+            
+            for (const [key, icon] of Object.entries(icons)) {
+                if (type.includes(key) || type.toLowerCase().includes(key.toLowerCase())) {
+                    return icon;
+                }
+            }
+            
+            return '↑'; // Default icon
+        }
+        
+        function clearRoute() {
+            if (currentRoute) {
+                if (currentRoute.driving && currentRoute.walking) {
+                    // Multi-segment route
+                    map.removeControl(currentRoute.driving);
+                    map.removeControl(currentRoute.walking);
+                } else {
+                    // Single route
+                    map.removeControl(currentRoute);
+                }
+                currentRoute = null;
+            }
+            
+            if (userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+                userLocationMarker = null;
+            }
+            
+            document.getElementById('directionsPanel').style.display = 'none';
+        }
+        
+        // Transport mode selection
+        document.querySelectorAll('.transport-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Update active button
+                document.querySelectorAll('.transport-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentTransportMode = this.dataset.transport;
+                
+                // Show/hide parking toggle for driving
+                const parkingToggle = document.getElementById('parkingToggle');
+                if (currentTransportMode === 'driving') {
+                    parkingToggle.style.display = 'flex';
+                } else {
+                    parkingToggle.style.display = 'none';
+                }
+                
+                // Recalculate route if destination is set
+                if (currentDestination) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        calculateRoute(
+                            position.coords.latitude,
+                            position.coords.longitude,
+                            currentDestination.lat,
+                            currentDestination.lng,
+                            currentDestination.name,
+                            currentTransportMode
+                        );
+                    });
+                }
+            });
+        });
+        
+        // Parking toggle change
+        document.getElementById('useParking').addEventListener('change', function() {
+            if (currentDestination && currentTransportMode === 'driving') {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    calculateRoute(
+                        position.coords.latitude,
+                        position.coords.longitude,
+                        currentDestination.lat,
+                        currentDestination.lng,
+                        currentDestination.name,
+                        currentTransportMode
+                    );
+                });
+            }
+        });
+        
+        // Close directions panel
+        document.getElementById('closeDirections').addEventListener('click', function() {
+            document.getElementById('directionsPanel').style.display = 'none';
+        });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
