@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UW Campus Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #4b2e83;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            position: relative;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .search-container {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+            margin: 0 2rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1001;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .search-result {
+            padding: 1rem;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        .search-result:hover {
+            background: #f8f9fa;
+        }
+
+        .search-result:last-child {
+            border-bottom: none;
+        }
+
+        .result-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .result-type {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .sidebar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .category-list {
+            list-style: none;
+        }
+
+        .category-item {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .category-item:hover {
+            background: #f8f9fa;
+        }
+
+        .category-item.active {
+            background: #e8f4f8;
+            border-left-color: #4b2e83;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-btn {
+            background: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            transform: translateY(-1px);
+        }
+
+        .toggle-sidebar {
+            background: #4b2e83;
+            color: white;
+            width: 50px;
+            height: 50px;
+        }
+
+        .custom-popup {
+            font-family: inherit;
+        }
+
+        .popup-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4b2e83;
+        }
+
+        .popup-info {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .popup-directions {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #eee;
+        }
+
+        .directions-btn {
+            background: #4b2e83;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .directions-btn:hover {
+            background: #3a2266;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .search-container {
+                margin: 0;
+                max-width: none;
+            }
+
+            .sidebar {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                z-index: 1000;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+
+            .main-container {
+                height: calc(100vh - 120px);
+            }
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 10px;
+        }
+
+        .leaflet-popup-tip {
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <h1>🏛️ UW Campus Map</h1>
+        </div>
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="Search buildings, departments, or locations..." id="searchInput">
+            <div class="search-results" id="searchResults"></div>
+        </div>
+        <div style="width: 100px;"></div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Categories</div>
+                <ul class="category-list">
+                    <li class="category-item active" data-category="all">All Buildings</li>
+                    <li class="category-item" data-category="academic">Academic</li>
+                    <li class="category-item" data-category="residential">Residential</li>
+                    <li class="category-item" data-category="dining">Dining</li>
+                    <li class="category-item" data-category="recreation">Recreation</li>
+                    <li class="category-item" data-category="services">Services</li>
+                    <li class="category-item" data-category="parking">Parking</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button class="control-btn toggle-sidebar" id="toggleSidebar">☰</button>
+                <button class="control-btn" id="locateBtn">📍</button>
+                <button class="control-btn" id="resetView">🏠</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // UW Campus Map Data
+        const uwBuildings = [
+            // Academic Buildings
+            { name: "Suzzallo Library", lat: 47.6564, lng: -122.3078, category: "academic", type: "Library", code: "SUZ" },
+            { name: "Odegaard Undergraduate Library", lat: 47.6566, lng: -122.3101, category: "academic", type: "Library", code: "OUG" },
+            { name: "Kane Hall", lat: 47.6566, lng: -122.3095, category: "academic", type: "Lecture Hall", code: "KNE" },
+            { name: "Smith Hall", lat: 47.6571, lng: -122.3090, category: "academic", type: "Academic", code: "SMI" },
+            { name: "Savery Hall", lat: 47.6570, lng: -122.3085, category: "academic", type: "Academic", code: "SAV" },
+            { name: "Padelford Hall", lat: 47.6588, lng: -122.3097, category: "academic", type: "Academic", code: "PDL" },
+            { name: "Mary Gates Hall", lat: 47.6553, lng: -122.3079, category: "academic", type: "Academic", code: "MGH" },
+            { name: "Johnson Hall", lat: 47.6574, lng: -122.3073, category: "academic", type: "Academic", code: "JHN" },
+            { name: "Gould Hall", lat: 47.6549, lng: -122.3066, category: "academic", type: "Architecture", code: "GLD" },
+            { name: "Denny Hall", lat: 47.6574, lng: -122.3068, category: "academic", type: "Academic", code: "DEN" },
+            
+            // STEM Buildings
+            { name: "Paul G. Allen Center", lat: 47.6532, lng: -122.3050, category: "academic", type: "Computer Science", code: "CSE" },
+            { name: "Engineering Library", lat: 47.6535, lng: -122.3048, category: "academic", type: "Library", code: "ENG" },
+            { name: "Loew Hall", lat: 47.6539, lng: -122.3053, category: "academic", type: "Engineering", code: "LOW" },
+            { name: "Mechanical Engineering", lat: 47.6545, lng: -122.3060, category: "academic", type: "Engineering", code: "MEB" },
+            { name: "Electrical Engineering", lat: 47.6541, lng: -122.3047, category: "academic", type: "Engineering", code: "EEB" },
+            { name: "Physics-Astronomy", lat: 47.6533, lng: -122.3116, category: "academic", type: "Science", code: "PAA" },
+            { name: "Chemistry Building", lat: 47.6556, lng: -122.3134, category: "academic", type: "Science", code: "CHB" },
+            { name: "Kincaid Hall", lat: 47.6548, lng: -122.3129, category: "academic", type: "Science", code: "KIN" },
+            
+            // Health Sciences
+            { name: "Health Sciences Building", lat: 47.6502, lng: -122.3085, category: "academic", type: "Health Sciences", code: "HSB" },
+            { name: "Magnuson Health Sciences Center", lat: 47.6489, lng: -122.3079, category: "academic", type: "Health Sciences", code: "HSC" },
+            
+            // Business & Law
+            { name: "Paccar Hall", lat: 47.6563, lng: -122.3052, category: "academic", type: "Business", code: "PAC" },
+            { name: "Condon Hall", lat: 47.6580, lng: -122.3063, category: "academic", type: "Law", code: "CDH" },
+            { name: "William H. Gates Hall", lat: 47.6581, lng: -122.3059, category: "academic", type: "Law", code: "GTS" },
+            
+            // Residential
+            { name: "McMahon Hall", lat: 47.6559, lng: -122.3152, category: "residential", type: "Residence Hall", code: "MCM" },
+            { name: "Haggett Hall", lat: 47.6587, lng: -122.3150, category: "residential", type: "Residence Hall", code: "HGT" },
+            { name: "Lander Hall", lat: 47.6583, lng: -122.3139, category: "residential", type: "Residence Hall", code: "LAN" },
+            { name: "McCarty Hall", lat: 47.6580, lng: -122.3154, category: "residential", type: "Residence Hall", code: "MCC" },
+            { name: "Hansee Hall", lat: 47.6575, lng: -122.3143, category: "residential", type: "Residence Hall", code: "HAN" },
+            { name: "Stevens Court", lat: 47.6594, lng: -122.3146, category: "residential", type: "Apartments", code: "STC" },
+            { name: "Mercer Court", lat: 47.6603, lng: -122.3154, category: "residential", type: "Apartments", code: "MRC" },
+            
+            // Dining
+            { name: "Local Point", lat: 47.6579, lng: -122.3151, category: "dining", type: "Dining Hall", code: "LPT" },
+            { name: "8 Market", lat: 47.6585, lng: -122.3147, category: "dining", type: "Market", code: "8MK" },
+            { name: "Husky Union Building (HUB)", lat: 47.6554, lng: -122.3073, category: "dining", type: "Student Union", code: "HUB" },
+            { name: "Cultivate", lat: 47.6556, lng: -122.3134, category: "dining", type: "Dining", code: "CUL" },
+            { name: "Center Table", lat: 47.6532, lng: -122.3050, category: "dining", type: "Dining", code: "CTB" },
+            
+            // Recreation
+            { name: "Intramural Activities Building", lat: 47.6515, lng: -122.3054, category: "recreation", type: "Recreation", code: "IMA" },
+            { name: "Husky Stadium", lat: 47.6502, lng: -122.3016, category: "recreation", type: "Stadium", code: "HUS" },
+            { name: "Hec Edmundson Pavilion", lat: 47.6522, lng: -122.3067, category: "recreation", type: "Arena", code: "HEC" },
+            { name: "Graves Building", lat: 47.6516, lng: -122.3078, category: "recreation", type: "Recreation", code: "GRV" },
+            { name: "Waterfront Activities Center", lat: 47.6479, lng: -122.3025, category: "recreation", type: "Recreation", code: "WAC" },
+            
+            // Services
+            { name: "Schmitz Hall", lat: 47.6558, lng: -122.3105, category: "services", type: "Administration", code: "SCH" },
+            { name: "Gerberding Hall", lat: 47.6550, lng: -122.3089, category: "services", type: "Administration", code: "GER" },
+            { name: "Hall Health Center", lat: 47.6567, lng: -122.3120, category: "services", type: "Health Services", code: "HHC" },
+            { name: "UW Bookstore", lat: 47.6556, lng: -122.3036, category: "services", type: "Bookstore", code: "BKS" },
+            { name: "University Services Building", lat: 47.6540, lng: -122.3125, category: "services", type: "Services", code: "USB" },
+            
+            // Parking
+            { name: "Central Plaza Garage", lat: 47.6551, lng: -122.3090, category: "parking", type: "Parking Garage", code: "CPG" },
+            { name: "Brooklyn Garage", lat: 47.6596, lng: -122.3121, category: "parking", type: "Parking Garage", code: "BRG" },
+            { name: "West Campus Garage", lat: 47.6554, lng: -122.3160, category: "parking", type: "Parking Garage", code: "WCG" },
+            { name: "Portage Bay Garage", lat: 47.6488, lng: -122.3049, category: "parking", type: "Parking Garage", code: "PBG" }
+        ];
+
+        // Initialize map
+        const map = L.map('map').setView([47.6553, -122.3095], 16);
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Custom icons for different categories
+        const icons = {
+            academic: '🎓',
+            residential: '🏠',
+            dining: '🍽️',
+            recreation: '⚽',
+            services: '🏢',
+            parking: '🅿️'
+        };
+
+        // Create markers
+        const markers = {};
+        const markerGroup = L.layerGroup().addTo(map);
+
+        function createMarker(building) {
+            const icon = L.divIcon({
+                html: `<div style="background: white; border: 2px solid #4b2e83; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${icons[building.category]}</div>`,
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            const marker = L.marker([building.lat, building.lng], { icon })
+                .bindPopup(`
+                    <div class="custom-popup">
+                        <div class="popup-title">${building.name}</div>
+                        <div class="popup-info"><strong>Type:</strong> ${building.type}</div>
+                        <div class="popup-info"><strong>Code:</strong> ${building.code}</div>
+                        <div class="popup-directions">
+                            <button class="directions-btn" onclick="getDirections(${building.lat}, ${building.lng})">Get Directions</button>
+                        </div>
+                    </div>
+                `, {
+                    closeButton: true,
+                    className: 'custom-popup'
+                });
+
+            return marker;
+        }
+
+        function showBuildings(category = 'all') {
+            markerGroup.clearLayers();
+            
+            const filteredBuildings = category === 'all' 
+                ? uwBuildings 
+                : uwBuildings.filter(building => building.category === category);
+
+            filteredBuildings.forEach(building => {
+                const marker = createMarker(building);
+                markers[building.name] = marker;
+                markerGroup.addLayer(marker);
+            });
+        }
+
+        // Initialize with all buildings
+        showBuildings();
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            const matches = uwBuildings.filter(building => 
+                building.name.toLowerCase().includes(query) ||
+                building.type.toLowerCase().includes(query) ||
+                building.code.toLowerCase().includes(query)
+            );
+
+            if (matches.length > 0) {
+                searchResults.innerHTML = matches.slice(0, 8).map(building => `
+                    <div class="search-result" onclick="selectBuilding('${building.name}')">
+                        <div class="result-name">${building.name}</div>
+                        <div class="result-type">${building.type} • ${building.code}</div>
+                    </div>
+                `).join('');
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.style.display = 'none';
+            }
+        });
+
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
+
+        function selectBuilding(name) {
+            const building = uwBuildings.find(b => b.name === name);
+            if (building && markers[name]) {
+                map.setView([building.lat, building.lng], 18);
+                markers[name].openPopup();
+                searchResults.style.display = 'none';
+                searchInput.value = '';
+            }
+        }
+
+        // Category filtering
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.category-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                
+                const category = this.dataset.category;
+                showBuildings(category);
+            });
+        });
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleSidebar');
+
+        toggleBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Map controls
+        document.getElementById('resetView').addEventListener('click', function() {
+            map.setView([47.6553, -122.3095], 16);
+        });
+
+        document.getElementById('locateBtn').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    map.setView([lat, lng], 17);
+                    
+                    L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            html: '<div style="background: #007bff; border: 2px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                            className: 'user-location',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map)
+                    .bindPopup('You are here')
+                    .openPopup();
+                });
+            }
+        });
+
+        // Directions function
+        function getDirections(lat, lng) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const userLat = position.coords.latitude;
+                    const userLng = position.coords.longitude;
+                    
+                    const url = `https://www.google.com/maps/dir/${userLat},${userLng}/${lat},${lng}`;
+                    window.open(url, '_blank');
+                }, function() {
+                    const url = `https://www.google.com/maps/dir//${lat},${lng}`;
+                    window.open(url, '_blank');
+                });
+            } else {
+                const url = `https://www.google.com/maps/dir//${lat},${lng}`;
+                window.open(url, '_blank');
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'k':
+                        e.preventDefault();
+                        searchInput.focus();
+                        break;
+                    case 'h':
+                        e.preventDefault();
+                        toggleBtn.click();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
